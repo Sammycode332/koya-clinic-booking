@@ -1,10 +1,9 @@
-from fastapi import FastAPI,Query
+from fastapi import FastAPI,Query,HTTPException,status
 from sqlalchemy import delete
 
 from database import SessionLocal
-from models import Slot
-from schemas import ResetRequest,SlotResponse
-
+from models import Slot,Booking
+from schemas import ResetRequest,SlotResponse,BookingResponse,BookingRequest
 app = FastAPI(title="Clinic Booking API")
 
 
@@ -51,3 +50,28 @@ def get_slots(provider: str | None = Query(default=None)):
             )
             for slot in slots
         ]
+@app.post(
+    "/bookings",
+    response_model=BookingResponse,
+    status_code=status.HTTP_201_CREATED
+)
+def create_booking(payload: BookingRequest):
+    with SessionLocal.begin() as session:
+        slot = session.get(Slot, payload.slot_id)
+
+        if slot is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Slot not found"
+            )
+
+        booking = Booking(
+            slot_id=payload.slot_id,
+            name=payload.name,
+            email=payload.email
+        )
+
+        session.add(booking)
+        session.flush()
+
+    return booking

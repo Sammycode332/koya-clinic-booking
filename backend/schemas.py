@@ -19,3 +19,16 @@ class SlotResponse(BaseModel):
     start: datetime
     end: datetime
     available: bool
+    
+class BookingResponse(BaseModel):
+    id: str
+    slot_id: str
+    name: str
+    email: str
+    status: str
+    created_at: datetime
+    
+class BookingRequest(BaseModel):
+    slot_id: str
+    name: str
+    email: str
