@@ -12,4 +12,10 @@ class SlotInput(BaseModel):
 
 class ResetRequest(BaseModel):
     slots: list[SlotInput]
-    
+
+class SlotResponse(BaseModel):
+    id: str
+    provider: str
+    start: datetime
+    end: datetime
+    available: bool
