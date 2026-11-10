@@ -19,7 +19,8 @@ class SlotResponse(BaseModel):
     start: datetime
     end: datetime
     available: bool
-    
+class SlotsResponse(BaseModel):
+    slots: list[SlotResponse] 
 class BookingResponse(BaseModel):
     id: str
     slot_id: str
@@ -29,6 +30,6 @@ class BookingResponse(BaseModel):
     created_at: datetime
     
 class BookingRequest(BaseModel):
-    slot_id: str
-    name: str
-    email: str
+    slot_id: str | None = None
+    name: str | None = None
+    email: str | None = None
