@@ -1,11 +1,39 @@
-from fastapi import FastAPI,Query,HTTPException,status
+import os
+import secrets
+
+from dotenv import load_dotenv
+from fastapi import FastAPI, Query, HTTPException, status, Depends, Header,Security
+from fastapi.security import APIKeyHeader
 from sqlalchemy import delete
 
 from database import SessionLocal
-from models import Slot,Booking
-from schemas import ResetRequest,SlotResponse,BookingResponse,BookingRequest
-app = FastAPI(title="Clinic Booking API")
+from models import Slot, Booking
+from schemas import ResetRequest, SlotResponse, BookingResponse, BookingRequest
 
+
+load_dotenv()
+
+API_KEY = os.getenv("API_KEY")
+
+if not API_KEY:
+    raise RuntimeError("API_KEY is not configured")
+
+api_key_header = APIKeyHeader(
+    name="X-API-Key",
+    auto_error=False
+)
+def verify_api_key(
+    x_api_key: str | None = Security(api_key_header)
+):
+    if not x_api_key or not secrets.compare_digest(x_api_key, API_KEY):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or missing API key"
+        )
+app = FastAPI(
+    title="Clinic Booking API",
+    dependencies=[Depends(verify_api_key)]
+)
 
 @app.get("/")
 def home():
