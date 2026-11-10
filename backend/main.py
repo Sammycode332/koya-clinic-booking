@@ -75,3 +75,16 @@ def create_booking(payload: BookingRequest):
         session.flush()
 
     return booking
+
+@app.get("/bookings/{id}", response_model=BookingResponse)
+def get_booking(id: str):
+    with SessionLocal() as session:
+        booking = session.get(Booking, id)
+
+        if booking is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Booking not found"
+            )
+
+        return booking
