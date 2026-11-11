@@ -41,7 +41,10 @@ def verify_api_key(
     request: Request,
     x_api_key: str | None = Security(api_key_header)
 ):
-    # Allow public root and health check for URL ping and status verification
+    # Allow CORS preflight requests (OPTIONS) and public status pings
+    if request.method == "OPTIONS":
+        return None
+
     if request.url.path in ["/", "/health"]:
         return None
 

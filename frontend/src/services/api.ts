@@ -28,9 +28,9 @@ export interface BookingsPaginationResponse {
 
 const API_BASE = import.meta.env.VITE_API_URL
   ? import.meta.env.VITE_API_URL.replace(/\/$/, '')
-  : '/api'
+  : (import.meta.env.PROD ? 'https://koya-clinic-booking-k12u.onrender.com' : '/api')
 
-const API_KEY = import.meta.env.VITE_API_KEY || ''
+const API_KEY = import.meta.env.VITE_API_KEY || 'f5OkEFdu_TmGDNayZbZlIgFTih0_PTOdij_J9TeY5Cs'
 
 function getHeaders(extraHeaders: Record<string, string> = {}): Record<string, string> {
   const headers: Record<string, string> = {
