@@ -58,10 +58,10 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=["https://koya-clinic-booking-zeta.vercel.app","http://localhost:5173"],
+    allow_credentials=False,
+    allow_methods=["GET","POST","DELETE","OPTIONS"],
+    allow_headers=["Content-Type","X-API-Key","Idempotency-Key"],
     expose_headers=["Retry-After"],
 )
 
