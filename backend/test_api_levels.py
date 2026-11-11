@@ -5,15 +5,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 from main import app, API_KEY
-from database import SessionLocal
-from models import Slot, Booking, BookingAttempt
 
 client = TestClient(app)
 HEADERS = {"X-API-Key": API_KEY}
 
 @pytest.fixture(autouse=True)
 def setup_slots():
-    # Clean up and seed fresh test slots
+    # Clean up and seed fresh test slots with diverse specialists
     future_start_1 = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
     future_end_1 = (datetime.now(timezone.utc) + timedelta(days=1, minutes=30)).isoformat()
     future_start_2 = (datetime.now(timezone.utc) + timedelta(days=2)).isoformat()
@@ -23,9 +21,9 @@ def setup_slots():
 
     reset_payload = {
         "slots": [
-            {"id": "slot-test-1", "provider": "Dr Ade", "start": future_start_1, "end": future_end_1},
-            {"id": "slot-test-2", "provider": "Dr Bola", "start": future_start_2, "end": future_end_2},
-            {"id": "slot-past", "provider": "Dr Ade", "start": past_start, "end": past_end},
+            {"id": "slot-test-1", "provider": "Dr Chioma Okafor", "start": future_start_1, "end": future_end_1},
+            {"id": "slot-test-2", "provider": "Dr Ibrahim Musa", "start": future_start_2, "end": future_end_2},
+            {"id": "slot-past", "provider": "Dr Fatima Bello", "start": past_start, "end": past_end},
         ]
     }
     res = client.post("/reset", json=reset_payload, headers=HEADERS)
@@ -42,11 +40,11 @@ def test_level_1_list_slots():
     assert data["slots"][0]["id"] == "slot-past"
 
 def test_level_1_filter_by_provider():
-    res = client.get("/slots?provider=Dr Bola", headers=HEADERS)
+    res = client.get("/slots?provider=Dr Ibrahim Musa", headers=HEADERS)
     assert res.status_code == 200
     slots = res.json()["slots"]
     assert len(slots) == 1
-    assert slots[0]["provider"] == "Dr Bola"
+    assert slots[0]["provider"] == "Dr Ibrahim Musa"
 
 def test_level_1_book_and_lookup():
     res = client.post(
@@ -60,10 +58,11 @@ def test_level_1_book_and_lookup():
     assert booking["slot_id"] == "slot-test-1"
     booking_id = booking["id"]
 
-    # Look up booking
+    # Look up booking by ID
     res_get = client.get(f"/bookings/{booking_id}", headers=HEADERS)
     assert res_get.status_code == 200
     assert res_get.json()["id"] == booking_id
+    assert res_get.json()["name"] == "Ada Obi"
 
 # ================= LEVEL 2 TESTS =================
 def test_level_2_missing_or_invalid_api_key():
@@ -81,7 +80,7 @@ def test_level_2_missing_required_fields():
     # Missing slot_id
     res = client.post(
         "/bookings",
-        json={"name": "Ada", "email": "ada@example.com"},
+        json={"name": "Kofi Mensah", "email": "kofi@example.com"},
         headers=HEADERS,
     )
     assert res.status_code == 400
@@ -90,16 +89,16 @@ def test_level_2_missing_required_fields():
     # Empty name
     res = client.post(
         "/bookings",
-        json={"slot_id": "slot-test-1", "name": "   ", "email": "ada@example.com"},
+        json={"slot_id": "slot-test-1", "name": "   ", "email": "kofi@example.com"},
         headers=HEADERS,
     )
     assert res.status_code == 400
     assert "error" in res.json()
 
-    # Invalid email
+    # Invalid email format
     res = client.post(
         "/bookings",
-        json={"slot_id": "slot-test-1", "name": "Ada", "email": "invalid-email"},
+        json={"slot_id": "slot-test-1", "name": "Kofi Mensah", "email": "not-an-email"},
         headers=HEADERS,
     )
     assert res.status_code == 400
@@ -109,7 +108,7 @@ def test_level_2_nonexistent_or_past_slot():
     # Slot not found
     res = client.post(
         "/bookings",
-        json={"slot_id": "nonexistent-slot", "name": "Ada", "email": "ada@example.com"},
+        json={"slot_id": "nonexistent-slot", "name": "Zainab Ahmed", "email": "zainab@example.com"},
         headers=HEADERS,
     )
     assert res.status_code == 404
@@ -118,7 +117,7 @@ def test_level_2_nonexistent_or_past_slot():
     # Slot already started (past slot)
     res_past = client.post(
         "/bookings",
-        json={"slot_id": "slot-past", "name": "Ada", "email": "ada@example.com"},
+        json={"slot_id": "slot-past", "name": "Zainab Ahmed", "email": "zainab@example.com"},
         headers=HEADERS,
     )
     assert res_past.status_code == 400
@@ -127,27 +126,27 @@ def test_level_2_nonexistent_or_past_slot():
 def test_level_2_trim_and_lowercase():
     res = client.post(
         "/bookings",
-        json={"slot_id": "slot-test-1", "name": "  Ada Obi  ", "email": "  ADA@Example.COM  "},
+        json={"slot_id": "slot-test-1", "name": "  Emeka Okonkwo  ", "email": "  EMEKA@Example.COM  "},
         headers=HEADERS,
     )
     assert res.status_code == 201
     booking = res.json()
-    assert booking["name"] == "Ada Obi"
-    assert booking["email"] == "ada@example.com"
+    assert booking["name"] == "Emeka Okonkwo"
+    assert booking["email"] == "emeka@example.com"
 
 # ================= LEVEL 3 TESTS =================
 def test_level_3_cannot_double_book():
     res1 = client.post(
         "/bookings",
-        json={"slot_id": "slot-test-1", "name": "Person 1", "email": "p1@example.com"},
+        json={"slot_id": "slot-test-1", "name": "Patient Alpha", "email": "alpha@example.com"},
         headers=HEADERS,
     )
     assert res1.status_code == 201
 
-    # Second person attempts to book same slot
+    # Second patient attempts to book the exact same slot
     res2 = client.post(
         "/bookings",
-        json={"slot_id": "slot-test-1", "name": "Person 2", "email": "p2@example.com"},
+        json={"slot_id": "slot-test-1", "name": "Patient Beta", "email": "beta@example.com"},
         headers=HEADERS,
     )
     assert res2.status_code == 409
@@ -156,7 +155,7 @@ def test_level_3_cannot_double_book():
 def test_level_3_cancel_booking_and_rebook():
     res = client.post(
         "/bookings",
-        json={"slot_id": "slot-test-1", "name": "Ada", "email": "ada@example.com"},
+        json={"slot_id": "slot-test-1", "name": "Amina Yusuf", "email": "amina@example.com"},
         headers=HEADERS,
     )
     booking_id = res.json()["id"]
@@ -171,10 +170,10 @@ def test_level_3_cancel_booking_and_rebook():
     assert del_again.status_code == 409
     assert "error" in del_again.json()
 
-    # Slot is now available to be booked again
+    # Slot is now available to be booked by another patient
     rebook = client.post(
         "/bookings",
-        json={"slot_id": "slot-test-1", "name": "New Person", "email": "new@example.com"},
+        json={"slot_id": "slot-test-1", "name": "Samuel Mensah", "email": "samuel@example.com"},
         headers=HEADERS,
     )
     assert rebook.status_code == 201
@@ -182,40 +181,48 @@ def test_level_3_cancel_booking_and_rebook():
 # ================= LEVEL 4 TESTS =================
 def test_level_4_idempotency():
     idem_key = str(uuid.uuid4())
-    payload = {"slot_id": "slot-test-1", "name": "Ada", "email": "ada@example.com"}
+    payload = {"slot_id": "slot-test-1", "name": "Ada Obi", "email": "ada@example.com"}
 
     # First request
     res1 = client.post("/bookings", json=payload, headers={**HEADERS, "Idempotency-Key": idem_key})
     assert res1.status_code == 201
     booking1 = res1.json()
 
-    # Retry with same key and same payload returns existing booking
+    # Retry with identical key and identical payload returns existing booking
     res2 = client.post("/bookings", json=payload, headers={**HEADERS, "Idempotency-Key": idem_key})
     assert res2.status_code in (200, 201)
     booking2 = res2.json()
     assert booking1["id"] == booking2["id"]
 
-    # Retry with same key but different body returns 422
-    different_payload = {"slot_id": "slot-test-2", "name": "Ada", "email": "ada@example.com"}
+    # Retry with same key but altered payload returns 422
+    different_payload = {"slot_id": "slot-test-2", "name": "Ada Obi", "email": "ada@example.com"}
     res3 = client.post("/bookings", json=different_payload, headers={**HEADERS, "Idempotency-Key": idem_key})
     assert res3.status_code == 422
     assert "error" in res3.json()
 
 def test_level_4_cursor_pagination():
-    email = "history@example.com"
-    # Seed multiple slots and bookings
+    email = "records@patient-history.com"
     future_start_base = datetime.now(timezone.utc) + timedelta(days=10)
+    
+    # Diverse doctors for the slots
+    providers = [
+        "Dr Chioma Okafor",
+        "Dr Ibrahim Musa",
+        "Dr Fatima Bello",
+        "Dr Ade Johnson",
+        "Dr Samuel Mensah"
+    ]
     slots = []
     for i in range(5):
         st = (future_start_base + timedelta(hours=i)).isoformat()
         et = (future_start_base + timedelta(hours=i, minutes=30)).isoformat()
-        slots.append({"id": f"page-slot-{i}", "provider": "Dr Ade", "start": st, "end": et})
+        slots.append({"id": f"page-slot-{i}", "provider": providers[i], "start": st, "end": et})
     client.post("/reset", json={"slots": slots}, headers=HEADERS)
 
     for i in range(5):
         client.post(
             "/bookings",
-            json={"slot_id": f"page-slot-{i}", "name": "Ada", "email": email},
+            json={"slot_id": f"page-slot-{i}", "name": "Patient History Test", "email": email},
             headers=HEADERS,
         )
 
@@ -244,13 +251,14 @@ def test_level_4_cursor_pagination():
 
 # ================= LEVEL 5 TESTS =================
 def test_level_5_rate_limiting():
-    spam_email = "spammer@example.com"
+    spam_email = "spam-detector@example.com"
     future_start_base = datetime.now(timezone.utc) + timedelta(days=20)
+    doctors = ["Dr Chioma Okafor", "Dr Ibrahim Musa", "Dr Fatima Bello", "Dr Ade Johnson", "Dr Samuel Mensah"]
     slots = []
     for i in range(10):
         st = (future_start_base + timedelta(hours=i)).isoformat()
         et = (future_start_base + timedelta(hours=i, minutes=30)).isoformat()
-        slots.append({"id": f"spam-slot-{i}", "provider": "Dr Ade", "start": st, "end": et})
+        slots.append({"id": f"spam-slot-{i}", "provider": doctors[i % len(doctors)], "start": st, "end": et})
     client.post("/reset", json={"slots": slots}, headers=HEADERS)
 
     # Send 5 requests (allowed)
