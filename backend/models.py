@@ -1,12 +1,12 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, String
+from sqlalchemy import Boolean, DateTime, String,ForeignKey, func, Index
 from sqlalchemy.orm import Mapped, mapped_column
 
 from database import Base
 from uuid import uuid4
 
-from sqlalchemy import ForeignKey, func
+
 
 class Slot(Base):
     __tablename__ = "slots"
@@ -34,7 +34,11 @@ class Booking(Base):
 
     name: Mapped[str] = mapped_column(String(150), nullable=False)
     email: Mapped[str] = mapped_column(String(255), nullable=False)
-
+    idempotency_key: Mapped[str | None] = mapped_column(
+        String(255),
+        unique=True,
+        nullable=True
+    )
     status: Mapped[str] = mapped_column(
         String(20),
         default="confirmed",
@@ -45,4 +49,27 @@ class Booking(Base):
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False
+    )
+class BookingAttempt(Base):
+    __tablename__ = "booking_attempts"
+
+    id: Mapped[str] = mapped_column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid4())
+    )
+
+    email: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False
+    )
+
+    attempted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False
+    )
+
+    __table_args__ = (
+        Index("ix_booking_attempts_email_time", "email", "attempted_at"),
     )
