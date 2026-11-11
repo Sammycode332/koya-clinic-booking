@@ -38,8 +38,13 @@ api_key_header = APIKeyHeader(
 )
 
 def verify_api_key(
+    request: Request,
     x_api_key: str | None = Security(api_key_header)
 ):
+    # Allow public root and health check for URL ping and status verification
+    if request.url.path in ["/", "/health"]:
+        return None
+
     if not x_api_key or not secrets.compare_digest(x_api_key, API_KEY):
         raise HTTPException(
             status_code=401,
@@ -96,7 +101,11 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.get("/")
 def home():
-    return {"message": "Clinic Booking API is running"}
+    return {"message": "Clinic Booking API is running", "status": "healthy"}
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
 @app.post("/reset")
 def reset_slots(payload: ResetRequest):
