@@ -297,17 +297,7 @@ export default function App() {
             <p className="mt-2 text-sm text-slate-600">
               Select an available time slot with your preferred medical specialist, provide your contact details, and receive an instant booking confirmation.
             </p>
-            <div className="mt-4 flex flex-wrap gap-2 text-xs font-medium text-slate-600">
-              <span className="flex items-center rounded-lg bg-white px-2.5 py-1 shadow-xs border border-slate-200">
-                ✨ Real-Time Double-Booking Protection
-              </span>
-              <span className="flex items-center rounded-lg bg-white px-2.5 py-1 shadow-xs border border-slate-200">
-                ⚡ Idempotent Safe Retries
-              </span>
-              <span className="flex items-center rounded-lg bg-white px-2.5 py-1 shadow-xs border border-slate-200">
-                🛡️ Spam Protected Rate Limiting
-              </span>
-            </div>
+           
           </div>
         </div>
       </div>
