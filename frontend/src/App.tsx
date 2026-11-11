@@ -280,7 +280,7 @@ export default function App() {
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-             
+              
               <span>My Appointments</span>
             </button>
           </nav>
@@ -507,7 +507,7 @@ export default function App() {
                       Patient Full Name <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
-          
+                      <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">👤</span>
                       <input
                         id="patient-name"
                         type="text"
@@ -525,6 +525,7 @@ export default function App() {
                       Email Address <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
+                      <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">✉️</span>
                       <input
                         id="patient-email"
                         type="email"
