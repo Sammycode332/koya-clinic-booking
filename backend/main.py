@@ -3,16 +3,16 @@ import secrets
 import base64
 from datetime import datetime, timezone, timedelta
 from math import ceil
+from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Query, HTTPException, status, Depends, Header, Security, Request
+from fastapi import FastAPI, APIRouter, Query, HTTPException, status, Depends, Header, Security, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader
 from fastapi.responses import JSONResponse
 from sqlalchemy import delete, select, and_, or_, func, text
 from email_validator import validate_email, EmailNotValidError
-from contextlib import asynccontextmanager
 
 from database import SessionLocal, Base, engine
 from models import Slot, Booking, BookingAttempt
@@ -38,16 +38,8 @@ api_key_header = APIKeyHeader(
 )
 
 def verify_api_key(
-    request: Request,
     x_api_key: str | None = Security(api_key_header)
 ):
-    # Allow CORS preflight requests (OPTIONS) and public status pings
-    if request.method == "OPTIONS":
-        return None
-
-    if request.url.path in ["/", "/health"]:
-        return None
-
     if not x_api_key or not secrets.compare_digest(x_api_key, API_KEY):
         raise HTTPException(
             status_code=401,
@@ -61,7 +53,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Clinic Booking API",
-    dependencies=[Depends(verify_api_key)],
     lifespan=lifespan
 )
 
@@ -102,6 +93,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={"error": error_msg}
     )
 
+# Public health endpoints (no API key required)
 @app.get("/")
 def home():
     return {"message": "Clinic Booking API is running", "status": "healthy"}
@@ -110,7 +102,10 @@ def home():
 def health():
     return {"status": "ok"}
 
-@app.post("/reset")
+# Assessment endpoints router protected by X-API-Key
+router = APIRouter(dependencies=[Depends(verify_api_key)])
+
+@router.post("/reset")
 def reset_slots(payload: ResetRequest):
     with SessionLocal.begin() as session:
         session.execute(delete(BookingAttempt))
@@ -131,7 +126,7 @@ def reset_slots(payload: ResetRequest):
 
     return {"message": "Done"}
 
-@app.get("/slots", response_model=SlotsResponse)
+@router.get("/slots", response_model=SlotsResponse)
 def get_slots(provider: str | None = Query(default=None)):
     with SessionLocal() as session:
         query = session.query(Slot)
@@ -154,7 +149,7 @@ def get_slots(provider: str | None = Query(default=None)):
             ]
         }
 
-@app.get("/bookings/{id}", response_model=BookingResponse)
+@router.get("/bookings/{id}", response_model=BookingResponse)
 def get_booking(id: str):
     with SessionLocal() as session:
         booking = session.get(Booking, id)
@@ -167,7 +162,7 @@ def get_booking(id: str):
 
         return booking
 
-@app.delete("/bookings/{id}", response_model=BookingResponse)
+@router.delete("/bookings/{id}", response_model=BookingResponse)
 def cancel_booking(id: str):
     with SessionLocal.begin() as session:
         booking = session.get(Booking, id)
@@ -196,7 +191,6 @@ def enforce_booking_rate_limit(email: str):
     retry_after = None
 
     with SessionLocal.begin() as session:
-        # PostgreSQL transaction advisory lock serializes checks for the same email
         if session.bind and session.bind.dialect.name == "postgresql":
             session.execute(
                 text("SELECT pg_advisory_xact_lock(hashtext(:email)::bigint)"),
@@ -232,7 +226,7 @@ def enforce_booking_rate_limit(email: str):
             headers={"Retry-After": str(retry_after)}
         )
 
-@app.post(
+@router.post(
     "/bookings",
     response_model=BookingResponse,
     status_code=status.HTTP_201_CREATED
@@ -269,7 +263,6 @@ def create_booking(
     if idempotency_key:
         idempotency_key = idempotency_key.strip() or None
 
-    # Check for existing idempotent request first
     if idempotency_key:
         with SessionLocal() as session:
             existing = session.query(Booking).filter(
@@ -291,7 +284,6 @@ def create_booking(
     enforce_booking_rate_limit(email)
 
     with SessionLocal.begin() as session:
-        # Double check inside transaction if idempotency key was committed concurrently
         if idempotency_key:
             existing_request = session.query(Booking).filter(
                 Booking.idempotency_key == idempotency_key
@@ -355,7 +347,7 @@ def create_booking(
 
     return booking
 
-@app.get("/bookings", response_model=BookingsResponse)
+@router.get("/bookings", response_model=BookingsResponse)
 def get_bookings(
     email: str | None = Query(default=None),
     limit: int = Query(default=10),
@@ -434,3 +426,6 @@ def get_bookings(
             "bookings": bookings,
             "next_cursor": next_cursor
         }
+
+# Mount the assessment router
+app.include_router(router)
