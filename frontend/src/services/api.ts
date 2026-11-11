@@ -26,21 +26,16 @@ export interface BookingsPaginationResponse {
   next_cursor: string | null
 }
 
-const API_BASE = import.meta.env.VITE_API_URL
-  ? import.meta.env.VITE_API_URL.replace(/\/$/, '')
-  : (import.meta.env.PROD ? 'https://koya-clinic-booking-k12u.onrender.com' : '/api')
+const API_BASE = '/api'
+const API_KEY = import.meta.env.VITE_API_KEY 
 
-const API_KEY = import.meta.env.VITE_API_KEY || 'f5OkEFdu_TmGDNayZbZlIgFTih0_PTOdij_J9TeY5Cs'
-
-function getHeaders(extraHeaders: Record<string, string> = {}): Record<string, string> {
-  const headers: Record<string, string> = {
+function getHeaders(
+  extraHeaders: Record<string, string> = {},
+): Record<string, string> {
+  return {
     'Content-Type': 'application/json',
     ...extraHeaders,
   }
-  if (API_KEY) {
-    headers['X-API-Key'] = API_KEY
-  }
-  return headers
 }
 
 export async function getSlots(provider?: string): Promise<Slot[]> {

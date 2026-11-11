@@ -106,4 +106,5 @@ pytest test_api_levels.py -v
 5. **Output Directory**: `dist`
 6. **Environment Variables**:
    - `VITE_API_URL`: `https://<your-render-service>.onrender.com`
-   - `VITE_API_KEY`: `f5OkEFdu_TmGDNayZbZlIgFTih0_PTOdij_J9TeY5Cs`
+   - `VITE_API_KEY`: `your api key here
+   `
