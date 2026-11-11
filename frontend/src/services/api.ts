@@ -1,4 +1,3 @@
-
 export interface Slot {
   id: string
   provider: string
@@ -18,12 +17,40 @@ export interface Booking {
   slot_id: string
   name: string
   email: string
-  status: string
+  status: 'confirmed' | 'cancelled' | string
   created_at: string
 }
 
-export async function getSlots(): Promise<Slot[]> {
-  const response = await fetch('/api/slots')
+export interface BookingsPaginationResponse {
+  bookings: Booking[]
+  next_cursor: string | null
+}
+
+const API_BASE = import.meta.env.VITE_API_URL
+  ? import.meta.env.VITE_API_URL.replace(/\/$/, '')
+  : '/api'
+
+const API_KEY = import.meta.env.VITE_API_KEY || ''
+
+function getHeaders(extraHeaders: Record<string, string> = {}): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...extraHeaders,
+  }
+  if (API_KEY) {
+    headers['X-API-Key'] = API_KEY
+  }
+  return headers
+}
+
+export async function getSlots(provider?: string): Promise<Slot[]> {
+  const url = provider
+    ? `${API_BASE}/slots?provider=${encodeURIComponent(provider)}`
+    : `${API_BASE}/slots`
+
+  const response = await fetch(url, {
+    headers: getHeaders(),
+  })
   const data = await response.json()
 
   if (!response.ok) {
@@ -35,21 +62,77 @@ export async function getSlots(): Promise<Slot[]> {
 
 export async function createBooking(
   payload: BookingRequest,
-  idempotencyKey: string,
+  idempotencyKey?: string,
 ): Promise<Booking> {
-  const response = await fetch('/api/bookings', {
+  const extraHeaders: Record<string, string> = {}
+  if (idempotencyKey) {
+    extraHeaders['Idempotency-Key'] = idempotencyKey
+  }
+
+  const response = await fetch(`${API_BASE}/bookings`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Idempotency-Key': idempotencyKey,
-    },
+    headers: getHeaders(extraHeaders),
     body: JSON.stringify(payload),
   })
 
   const data = await response.json()
 
   if (!response.ok) {
-    throw new Error(data.error ?? 'Unable to create booking')
+    const errorMsg = data.error ?? 'Unable to create booking'
+    const retryAfter = response.headers.get('Retry-After')
+    if (response.status === 429 && retryAfter) {
+      throw new Error(`${errorMsg} (Please wait ${retryAfter}s)`)
+    }
+    throw new Error(errorMsg)
+  }
+
+  return data
+}
+
+export async function getBooking(id: string): Promise<Booking> {
+  const response = await fetch(`${API_BASE}/bookings/${encodeURIComponent(id)}`, {
+    headers: getHeaders(),
+  })
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.error ?? 'Booking not found')
+  }
+
+  return data
+}
+
+export async function cancelBooking(id: string): Promise<Booking> {
+  const response = await fetch(`${API_BASE}/bookings/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: getHeaders(),
+  })
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.error ?? 'Unable to cancel booking')
+  }
+
+  return data
+}
+
+export async function getBookingsByEmail(
+  email: string,
+  cursor?: string | null,
+  limit: number = 5,
+): Promise<BookingsPaginationResponse> {
+  let url = `${API_BASE}/bookings?email=${encodeURIComponent(email)}&limit=${limit}`
+  if (cursor) {
+    url += `&cursor=${encodeURIComponent(cursor)}`
+  }
+
+  const response = await fetch(url, {
+    headers: getHeaders(),
+  })
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.error ?? 'Unable to fetch booking history')
   }
 
   return data
