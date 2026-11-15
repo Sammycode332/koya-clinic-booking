@@ -16,12 +16,14 @@ A full-stack, production-ready clinic appointment booking web application and RE
 ## 🌟 Feature Breakdown by Assessment Level
 
 ### Level 1: Core Appointment Flow
+
 - `POST /reset`: Resets all bookings and seeds slot inventory with doctors across multiple specialties (Cardiology, Pediatrics, General Practice, Dermatology).
 - `GET /slots`: Lists available and booked slots in chronological order (`ORDER BY start ASC`), with exact match `provider` query filtering.
 - `POST /bookings`: Creates an appointment reservation and returns `201 Created` with booking details and confirmed status.
 - `GET /bookings/{id}`: Retrieves appointment record by ID (`404` if not found).
 
 ### Level 2: Security & Input Validation
+
 - **Authentication**: `X-API-Key` required on all routes. Missing or invalid keys return `401 Unauthorized` with `{"error": "Invalid or missing API key"}`.
 - **Strict Error Schema**: All error responses return standard `{"error": "<message>"}` (FastAPI validation errors converted automatically).
 - **Validation Rules**:
@@ -32,11 +34,13 @@ A full-stack, production-ready clinic appointment booking web application and RE
   - Slots with a start time in the past return `400 Bad Request` (`"This appointment has already started"`).
 
 ### Level 3: Concurrency Protection & Cancellations
+
 - **Zero Double-Bookings**: PostgreSQL row-level locks (`SELECT ... FOR UPDATE`) serialize concurrent booking attempts on the same slot, ensuring only one succeeds. Subsequent simultaneous attempts return `409 Conflict` (`"This slot is already booked"`).
 - `DELETE /bookings/{id}`: Cancels a confirmed booking, sets `status: "cancelled"`, and immediately frees the slot.
 - Cancelling an already cancelled booking returns `409 Conflict`.
 
 ### Level 4: Idempotency & History Cursor Pagination
+
 - **Idempotent Bookings**: Supports `Idempotency-Key` header on `POST /bookings`.
   - Retried requests with an identical payload safely return the existing booking.
   - Reusing the key with altered payload returns `422 Unprocessable Entity`.
@@ -44,6 +48,7 @@ A full-stack, production-ready clinic appointment booking web application and RE
 - Supports cursor pagination via `limit` (1–50, default 10), `cursor`, and returns `next_cursor` (or `null` on the last page).
 
 ### Level 5: Anti-Spam Rate Limiting
+
 - Prevents booking spam by enforcing a ceiling of **5 booking attempts per email per minute**.
 - Serialized per-email checks using PostgreSQL advisory transactions locks (`pg_advisory_xact_lock`).
 - Requests exceeding the threshold return `429 Too Many Requests` accompanied by an HTTP `Retry-After: <seconds>` header.
@@ -53,6 +58,7 @@ A full-stack, production-ready clinic appointment booking web application and RE
 ## 🩺 Frontend Web Application
 
 A clean, clinic-grade patient interface built with React 19, TypeScript, and Tailwind CSS v4:
+
 1. **Interactive Appointment Booking**:
    - Filter slots by medical specialist (Dr. Chioma Okafor, Dr. Ibrahim Musa, Dr. Fatima Bello, etc.).
    - Toggle to view only available slots.
@@ -78,7 +84,8 @@ A clean, clinic-grade patient interface built with React 19, TypeScript, and Tai
 
 ## 🧪 Automated Test Suite
 
-Run the full 12-test suite against the live database:
+Run the backend suite against an isolated test database only (the suite resets data):
+
 ```bash
 cd backend
 # With virtual environment activated:
@@ -90,6 +97,7 @@ pytest test_api_levels.py -v
 ## 🚀 Deployment Instructions
 
 ### Backend (Render)
+
 1. New Web Service from GitHub repo (`koya-clinic-booking`).
 2. **Root Directory**: `backend`
 3. **Build Command**: `pip install -r requirements.txt`
@@ -99,12 +107,14 @@ pytest test_api_levels.py -v
    - `API_KEY`: Your secret API key.
 
 ### Frontend (Vercel)
+
 1. New Project on Vercel from GitHub repo (`koya-clinic-booking`).
 2. **Root Directory**: `frontend`
 3. **Framework**: Vite
 4. **Build Command**: `npm run build`
 5. **Output Directory**: `dist`
-6. **Environment Variables**:
-   - `VITE_API_URL`: `https://<your-render-service>.onrender.com`
-   - `VITE_API_KEY`: `your api key here
-   `
+6. **Server-side Environment Variables**:
+   - `API_KEY`: the same secret configured on Render.
+   - `BACKEND_URL`: optional backend origin; defaults to the existing Render deployment.
+
+Do not expose the API key through `VITE_` variables. See [frontend setup and tests](frontend/README.md).

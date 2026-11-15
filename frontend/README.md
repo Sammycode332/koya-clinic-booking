@@ -1,75 +1,38 @@
-# React + TypeScript + Vite
+## Patient portal improvements
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The responsive portal includes doctor/date filtering, available-time filtering,
+booking references, calendar downloads, lookup, paginated history, and cancellation.
+Dates and times use the visitor's local timezone, which is displayed above the slots.
+Expired slots cannot be selected. Retrying an unchanged booking within the page session
+reuses its idempotency key. No patient details are saved in browser storage.
 
-Currently, two official plugins are available:
+### Frontend development and checks
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Use Node.js 22.18+ and run from `frontend`:
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```sh
+npm ci
+npm run dev
+npm run build
+npm test
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+For local development, start the FastAPI backend separately. Vite reads `API_KEY`
+and optional `BACKEND_URL` from `backend/.env` and attaches the key through its server proxy.
+Never put the secret into a `VITE_` environment variable.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Vercel configuration
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Set the project root to `frontend`, use the Vite preset, build with `npm run build`,
+and serve `dist`. Configure **API_KEY** as a server-side environment variable matching
+Render's key. Optionally set **BACKEND_URL** (defaults to the existing Render deployment).
+Redeploy after changing environment variables.
 
-```
+`api/[...path].ts` forwards the supported patient routes and keeps authentication
+server-side. The administrative `/reset` endpoint is deliberately not exposed through
+this public proxy. The Vercel rewrite excludes API routes from the SPA fallback.
+See [Vercel's Vite documentation](https://vercel.com/docs/frameworks/frontend/vite).
+
+The Node tests mock upstream calls: they never create or cancel real appointments.
+The existing backend test suite resets database contents; run it only against an isolated
+test database, not production.

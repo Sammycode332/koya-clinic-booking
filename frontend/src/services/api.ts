@@ -1,134 +1,87 @@
 export interface Slot {
-  id: string
-  provider: string
-  start: string
-  end: string
-  available: boolean
+  id: string;
+  provider: string;
+  start: string;
+  end: string;
+  available: boolean;
 }
-
 export interface BookingRequest {
-  slot_id: string
-  name: string
-  email: string
+  slot_id: string;
+  name: string;
+  email: string;
 }
-
 export interface Booking {
-  id: string
-  slot_id: string
-  name: string
-  email: string
-  status: 'confirmed' | 'cancelled' | string
-  created_at: string
+  id: string;
+  slot_id: string;
+  name: string;
+  email: string;
+  status: string;
+  created_at: string;
 }
-
 export interface BookingsPaginationResponse {
-  bookings: Booking[]
-  next_cursor: string | null
+  bookings: Booking[];
+  next_cursor: string | null;
 }
 
-const API_BASE = '/api'
-const API_KEY = import.meta.env.VITE_API_KEY 
-
-function getHeaders(
-  extraHeaders: Record<string, string> = {},
-): Record<string, string> {
-  return {
-    'Content-Type': 'application/json',
-    ...extraHeaders,
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
   }
 }
 
-export async function getSlots(provider?: string): Promise<Slot[]> {
-  const url = provider
-    ? `${API_BASE}/slots?provider=${encodeURIComponent(provider)}`
-    : `${API_BASE}/slots`
-
-  const response = await fetch(url, {
-    headers: getHeaders(),
-  })
-  const data = await response.json()
-
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(`/api${path}`, {
+      ...options,
+      headers: { "Content-Type": "application/json", ...options.headers },
+      signal: AbortSignal.timeout(60000),
+    });
+  } catch {
+    throw new Error(
+      "The clinic could not be reached. Please check your connection and try again.",
+    );
+  }
+  const data = await response.json().catch(() => null);
   if (!response.ok) {
-    throw new Error(data.error ?? 'Unable to load appointment slots')
+    const wait = response.headers.get("Retry-After");
+    throw new ApiError(
+      `${data?.error || "The request could not be completed. Please try again."}${response.status === 429 && wait ? ` Try again in ${wait} seconds.` : ""}`,
+      response.status,
+    );
   }
-
-  return data.slots
+  if (!data)
+    throw new Error(
+      "The clinic returned an unexpected response. Please try again.",
+    );
+  return data as T;
 }
-
-export async function createBooking(
+export async function getSlots(): Promise<Slot[]> {
+  return (await request<{ slots: Slot[] }>("/slots")).slots;
+}
+export function createBooking(
   payload: BookingRequest,
-  idempotencyKey?: string,
+  key: string,
 ): Promise<Booking> {
-  const extraHeaders: Record<string, string> = {}
-  if (idempotencyKey) {
-    extraHeaders['Idempotency-Key'] = idempotencyKey
-  }
-
-  const response = await fetch(`${API_BASE}/bookings`, {
-    method: 'POST',
-    headers: getHeaders(extraHeaders),
+  return request("/bookings", {
+    method: "POST",
+    headers: { "Idempotency-Key": key },
     body: JSON.stringify(payload),
-  })
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    const errorMsg = data.error ?? 'Unable to create booking'
-    const retryAfter = response.headers.get('Retry-After')
-    if (response.status === 429 && retryAfter) {
-      throw new Error(`${errorMsg} (Please wait ${retryAfter}s)`)
-    }
-    throw new Error(errorMsg)
-  }
-
-  return data
+  });
 }
-
-export async function getBooking(id: string): Promise<Booking> {
-  const response = await fetch(`${API_BASE}/bookings/${encodeURIComponent(id)}`, {
-    headers: getHeaders(),
-  })
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.error ?? 'Booking not found')
-  }
-
-  return data
+export function getBooking(id: string): Promise<Booking> {
+  return request(`/bookings/${encodeURIComponent(id)}`);
 }
-
-export async function cancelBooking(id: string): Promise<Booking> {
-  const response = await fetch(`${API_BASE}/bookings/${encodeURIComponent(id)}`, {
-    method: 'DELETE',
-    headers: getHeaders(),
-  })
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.error ?? 'Unable to cancel booking')
-  }
-
-  return data
+export function cancelBooking(id: string): Promise<Booking> {
+  return request(`/bookings/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
-
-export async function getBookingsByEmail(
+export function getBookingsByEmail(
   email: string,
-  cursor?: string | null,
-  limit: number = 5,
+  cursor: string | null = null,
 ): Promise<BookingsPaginationResponse> {
-  let url = `${API_BASE}/bookings?email=${encodeURIComponent(email)}&limit=${limit}`
-  if (cursor) {
-    url += `&cursor=${encodeURIComponent(cursor)}`
-  }
-
-  const response = await fetch(url, {
-    headers: getHeaders(),
-  })
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.error ?? 'Unable to fetch booking history')
-  }
-
-  return data
+  const query = new URLSearchParams({ email, limit: "5" });
+  if (cursor) query.set("cursor", cursor);
+  return request(`/bookings?${query}`);
 }
