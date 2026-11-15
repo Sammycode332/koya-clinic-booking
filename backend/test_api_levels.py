@@ -258,14 +258,14 @@ def test_level_5_rate_limiting():
     for i in range(10):
         st = (future_start_base + timedelta(hours=i)).isoformat()
         et = (future_start_base + timedelta(hours=i, minutes=30)).isoformat()
-        slots.append({"id": f"spam-slot-{i}", "provider": doctors[i % len(doctors)], "start": st, "end": et})
+        slots.append({"id": f"slot-{i}", "provider": doctors[i % len(doctors)], "start": st, "end": et})
     client.post("/reset", json={"slots": slots}, headers=HEADERS)
 
     # Send 5 requests (allowed)
     for i in range(5):
         res = client.post(
             "/bookings",
-            json={"slot_id": f"spam-slot-{i}", "name": "Spam User", "email": spam_email},
+            json={"slot_id": f"slot-{i}", "name": "Spam User", "email": spam_email},
             headers=HEADERS,
         )
         assert res.status_code == 201
@@ -273,7 +273,7 @@ def test_level_5_rate_limiting():
     # 6th request should trigger 429
     res_blocked = client.post(
         "/bookings",
-        json={"slot_id": "spam-slot-5", "name": "Spam User", "email": spam_email},
+        json={"slot_id": "slot-5", "name": "Spam User", "email": spam_email},
         headers=HEADERS,
     )
     assert res_blocked.status_code == 429

@@ -427,5 +427,5 @@ def get_bookings(
             "next_cursor": next_cursor
         }
 
-# Mount the assessment router
+
 app.include_router(router)
